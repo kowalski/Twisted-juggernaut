@@ -1,7 +1,6 @@
 from twisted.trial import unittest
 from twisted.python import log
-from twisted.internet import protocol, defer
-from twisted.internet import reactor
+from twisted.internet import protocol, defer, task, reactor
 import juggernaut
 
 import sys
@@ -43,14 +42,12 @@ class SubscribeTest(unittest.TestCase):
             request.finish()
         defer2 = self.webServer.onRequest.addCallback(onRequest).addErrback(errorHandler)
         
-        def assertsOnService(*a):
+        def assertsOnService():
             self.assertEqual(len(self.service.channels.keys()), 1)
             self.assertEqual(len(self.service.channels[1]), 1)
-            client.connector.disconnect()
-        reactor.callLater(0.05, assertsOnService)
+        task.deferLater(reactor, 0.05, assertsOnService
+            ).addCallback(lambda _: client.connector.disconnect())
             
-        #self.addCleanup(client.connector.disconnect)
-        
         return client.disconnectedEvent
         
     def testSubscribeDisconnectsWhenCodeNot200(self):
