@@ -66,3 +66,25 @@ class SubscribeTest(unittest.TestCase):
         
         return client.disconnectedEvent
         
+    def testManySubscribers(self):
+        self.webServer.giveOnly200()
+        
+        def sendMsg(client, id, channels):
+            client.connector.transport.write(client.subscribeMessage(id, channels))
+        client1 = MockFlashClient()
+        client2 = MockFlashClient()
+        client3 = MockFlashClient()
+        client1.connectedEvent.addCallback(lambda _: sendMsg(client1, 1, [1]))
+        client2.connectedEvent.addCallback(lambda _: sendMsg(client2, 2, [1]))
+        client3.connectedEvent.addCallback(lambda _: sendMsg(client3, 3, [2]))
+        
+        def assertsOnService():
+            self.assertEqual(len(self.service.channels.keys()), 2)
+            self.assertEqual(len(self.service.channels[1]), 2)
+            self.assertEqual(len(self.service.channels[2]), 1)
+        task.deferLater(reactor, 0.05, assertsOnService
+            ).addCallback(lambda _: client1.connector.disconnect()
+            ).addCallback(lambda _: client2.connector.disconnect()
+            ).addCallback(lambda _: client3.connector.disconnect())
+            
+        return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])

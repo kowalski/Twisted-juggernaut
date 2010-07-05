@@ -46,22 +46,28 @@ class RootResource(resource.Resource):
     pass
 
 class ChildResource(resource.Resource):
-    def __init__(self, onRequest):
-        self.onRequest = onRequest
+    def __init__(self, webserver):
+        self.webserver = webserver
         
     def render_POST(self, request):
-        self.onRequest.callback(request)
+        if self.webserver.return200s:
+            return ""
+        self.webserver.onRequest.callback(request)
         return server.NOT_DONE_YET
 
 class MockWebServer:
     def __init__(self):
         resource = RootResource()
         self.onRequest = defer.Deferred()
-        resource.putChild('subscribe', ChildResource(self.onRequest))
-        resource.putChild('disconnected', ChildResource(self.onRequest))
-        resource.putChild('logged_out', ChildResource(self.onRequest))
+        resource.putChild('subscribe', ChildResource(self))
+        resource.putChild('disconnected', ChildResource(self))
+        resource.putChild('logged_out', ChildResource(self))
         self.site = server.Site(resource)
         self.connector = reactor.listenTCP(8080, self.site)
+        self.return200s = False
 
+    def giveOnly200(self):
+        self.return200s = True
+        
 def errorHandler(a):
     log.err(str(a))
