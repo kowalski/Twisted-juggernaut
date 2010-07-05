@@ -6,6 +6,8 @@ from twisted.web import client as web_client
 from zope.interface import implements, Interface
 import sys, re, json
 
+from helpers import RequestParamsHelper
+
 class JuggernautProtocol(protocol.Protocol):
     
     CR = "\0"
@@ -45,13 +47,14 @@ class JuggernautProtocol(protocol.Protocol):
         self.client_id = request['client_id']
         self.session_id = request['session_id']
         
-        self.factory.service.subscribe_request(self, request['channels']
-            ).addErrback(self.subscribe_fail)
+        #def sendMessages(self, content):
+            #if len(content) > 0:
+                #log.msg("Sending payload from subscribe request to the client")
+                #messages = json.load(content)
+                #for message in messages:
+                    #self.transport.write(
+        self.factory.service.subscribe_request(self, request['channels'])
             
-    def subscribe_fail(self, err):
-        log.err("Sending request failed %s" % str(err))
-        self.transport.loseConnection()
-    
     def connectionMade(self):
         self.factory.service.clients.append(self)
         
@@ -84,7 +87,7 @@ class JuggernautService(service.Service):
     
     def __init__(self, options):
         self.clients = []
-        self.channels = []
+        self.channels = {}
         self.config = options
     
     def broadcast(self, msg):
@@ -92,7 +95,26 @@ class JuggernautService(service.Service):
             client.transport.write("###\nMessage: %s\n###\n" % msg)
             
     def subscribe_request(self, client, channels):
-        return web_client.getPage(self.config['subscription_url'], method="POST", postdata="aaa=444&bbb=333")
+        content_helper = RequestParamsHelper(client, channels, self)
+        request_task = web_client.getPage(self.config['subscription_url'], method="POST", postdata=content_helper.subscribe_params()) 
+        def appendClientToChannel(*a):
+            try:
+                self.channels[channels[0]].append(client)
+            except KeyError:
+                self.channels[channels[0]] = [ client ]
+        def subscribeFail(err):
+            log.err("Sending request failed %s" % str(err))
+            client.transport.loseConnection()
+        
+        request_task.addCallbacks(appendClientToChannel, subscribeFail)
+        
+        return request_task 
+    
+    def clients_in_channel(self, channel):
+        try:
+            return self.channels[channel]
+        except KeyError:
+            return []
 
 components.registerAdapter(JuggernautService, IJuggernautService, service.IService)
 

@@ -4,45 +4,68 @@ from twisted.internet import protocol, defer
 from twisted.internet import reactor
 import juggernaut
 
-class ClientProtocol(protocol.Protocol):
-    def connectionMade(self):
-        self.factory.onConnectionMade.callback(self)
-
-    def connectionLost(self, *a):
-        self.factory.onConnectionLost.callback(self)
+import sys
+sys.path.append('test')
+from test_helper import *
 
 class SubscribeTest(unittest.TestCase):
-    test_config = {
-        'port': 5001,
-        'subscription_url': 'http://localhost:3000/juggernaut/subscribe',
-        'allowed_ips': ['127.0.0.1'],
-        'logout_connection_url': 'http://localhost:3000/juggernaut/disconnected',
-        'logout_url': 'http://localhost:3000/juggernaut/logged_out'
-    }
+    timeout = 5
     
     def setUp(self):
-        self.service = juggernaut.makeService(self.test_config)
+        self.service = juggernaut.makeService(TestConfig.config)
         factory = juggernaut.IJuggernautFactory(self.service)
-        self.listening_port = reactor.listenTCP(self.test_config['port'], factory)
+        self.listeningPort = reactor.listenTCP(TestConfig.config['port'], factory)
+        
+        self.webServer = MockWebServer()
         
     def tearDown(self):
-        return self.listening_port.stopListening()
+        return defer.DeferredList([self.listeningPort.stopListening(), self.webServer.connector.stopListening()])
 
-    def _connectClient(self, d1, d2):
-        factory = protocol.ClientFactory()
-        factory.protocol = ClientProtocol
-        factory.onConnectionMade = d1
-        factory.onConnectionLost = d2
-        return reactor.connectTCP('localhost', self.test_config['port'], factory)
-    
-    def testConnect(self):
-        connectedEvent = defer.Deferred()
-        disconnectedEvent = defer.Deferred()
-        client = self._connectClient(connectedEvent, disconnectedEvent)
+    def testNonJsonDissconnects(self):
+        client = MockFlashClient()
         
         def sendMsg(a):
-            client.transport.write('czesc\0')
-        connectedEvent.addCallback(sendMsg)
+            client.connector.transport.write('czesc\0')
+        client.connectedEvent.addCallback(sendMsg)
         
-        return disconnectedEvent
+        return client.disconnectedEvent
+        
+    def testSubscribeSuccessful(self):
+        client = MockFlashClient()
+        
+        def sendMsg(a):
+            client.connector.transport.write(client.subscribeMessage(1))
+        defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
+        
+        def onRequest(request):
+            self.assertEqual(request.content.read(), "client_id=1&session_id=1&channels[]=1")
+            self.assertEqual(request.prePathURL().split('/')[-1], 'subscribe')
+            request.finish()
+        defer2 = self.webServer.onRequest.addCallback(onRequest).addErrback(errorHandler)
+        
+        def assertsOnService(*a):
+            self.assertEqual(len(self.service.channels.keys()), 1)
+            self.assertEqual(len(self.service.channels[1]), 1)
+            client.connector.disconnect()
+        reactor.callLater(0.05, assertsOnService)
+            
+        #self.addCleanup(client.connector.disconnect)
+        
+        return client.disconnectedEvent
+        
+    def testSubscribeDisconnectsWhenCodeNot200(self):
+        client = MockFlashClient()
+        
+        def sendMsg(a):
+            client.connector.transport.write(client.subscribeMessage(1))
+        defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
+        
+        def onRequest(request):
+            self.assertEqual(request.content.read(), "client_id=1&session_id=1&channels[]=1")
+            self.assertEqual(request.prePathURL().split('/')[-1], 'subscribe')
+            request.setResponseCode(409)
+            request.finish()
+        defer2 = self.webServer.onRequest.addCallback(onRequest).addErrback(errorHandler)
+        
+        return client.disconnectedEvent
         
