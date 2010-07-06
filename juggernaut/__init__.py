@@ -47,7 +47,7 @@ class JuggernautProtocol(protocol.Protocol):
         self._checkExists(request, 'client_id', int)
         self._checkExists(request, 'session_id', int)
         if len(request['channels']) != 1:
-            raise ValueError("You can pass only one channel to subscribe to")
+            raise ValueError("You can pass only one channel to subscribe to!")
     
         self.session_id = request['session_id']
         self.client_id = request['client_id']
@@ -109,7 +109,6 @@ class JuggernautService(service.Service):
         def appendClientToChannel(*a):
             try:
                 self.channels[channel_id].append(client)
-                log.msg(self.channels)
             except KeyError:
                 self.channels[channel_id] = [ client ]
             client.channel_id = channel_id
