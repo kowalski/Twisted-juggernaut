@@ -42,32 +42,53 @@ class MockFlashClient:
         }
         return json.dumps(handshake) + "\0"
         
-class RootResource(resource.Resource):
-    pass
-
 class ChildResource(resource.Resource):
     def __init__(self, webserver):
         self.webserver = webserver
         
     def render_POST(self, request):
-        if self.webserver.return200s:
-            return ""
-        self.webserver.onRequest.callback(request)
+        if self.webserver.counter >= len(self.webserver.deferList):
+            raise Exception("Request not expected %s!" % str(request))
+        self.webserver.requests.append(request)
+        
+        def defaultHandler((r, c)):
+            request.finish()
+        handler = self.webserver.requestHandler or defaultHandler
+        
+        d = self.webserver.deferList[self.webserver.counter]
+        d.addCallback(handler).addErrback(errorHandler)
+        d.callback((request, self.webserver.counter))
+        
+        self.webserver.counter += 1
+        
         return server.NOT_DONE_YET
 
 class MockWebServer:
     def __init__(self):
-        resource = RootResource()
-        self.onRequest = defer.Deferred()
-        resource.putChild('subscribe', ChildResource(self))
-        resource.putChild('disconnected', ChildResource(self))
-        resource.putChild('logged_out', ChildResource(self))
-        self.site = server.Site(resource)
+        res = resource.Resource()
+        self.requestHandler = None
+        res.putChild('subscribe', ChildResource(self))
+        res.putChild('disconnected', ChildResource(self))
+        res.putChild('logged_out', ChildResource(self))
+        self.site = server.Site(res)
         self.connector = reactor.listenTCP(8080, self.site)
-        self.return200s = False
-
-    def giveOnly200(self):
-        self.return200s = True
         
+        self.return200s = False
+        self.counter = 0
+        self.deferList = []
+        self.requests = []
+
+    def expectRequests(self, num):
+        self.deferList = map(lambda _: defer.Deferred(), range(num))
+    
+    @defer.deferredGenerator
+    def waitForAllRequests(self):
+        d = defer.waitForDeferred(self.getAllRequests())
+        yield d
+        d.getResult()
+        
+    def getAllRequests(self):
+        return defer.DeferredList(self.deferList)
+
 def errorHandler(a):
     log.err(str(a))

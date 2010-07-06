@@ -15,6 +15,9 @@ class JuggernautProtocol(protocol.Protocol):
     
     def __init__(self):
         self.buffer = ""
+        self.channel_id = None
+        self.client_id = None
+        self.session_id = None
         
     def dataReceived(self, data):
         self.buffer += data
@@ -31,21 +34,23 @@ class JuggernautProtocol(protocol.Protocol):
         try:
             request = json.loads(message)
             self._checkExists(request, 'command', unicode)
-            method = getattr(self, request['command'] + "_command")
+            method = getattr(self, request['command'] + "Command")
             method(request)
         except Exception as e:
             log.err("Processing message failed with exception: %s" % str(e))
             self.transport.loseConnection()
         
-    def subscribe_command(self, request):
+    def subscribeCommand(self, request):
         log.msg("SUBSCRIBE: %s" % str(request))
         
         self._checkExists(request, 'channels', list)
         self._checkExists(request, 'client_id', int)
         self._checkExists(request, 'session_id', int)
-        
-        self.client_id = request['client_id']
+        if len(request['channels']) != 1:
+            raise ValueError("You can pass only one channel to subscribe to")
+    
         self.session_id = request['session_id']
+        self.client_id = request['client_id']
         
         #def sendMessages(self, content):
             #if len(content) > 0:
@@ -53,13 +58,15 @@ class JuggernautProtocol(protocol.Protocol):
                 #messages = json.load(content)
                 #for message in messages:
                     #self.transport.write(
-        self.factory.service.subscribe_request(self, request['channels'])
+        self.factory.service.subscribeRequest(self, request['channels'])
             
     def connectionMade(self):
         self.factory.service.clients.append(self)
         
     def connectionLost(self, reason):
-        self.factory.service.clients.remove(self)
+        log.msg('Connection lost channel_id %s' % str(self.channel_id))
+        if self.channel_id:
+            self.factory.service.removeClient(self)
 
     def _checkExists(self, request, key, klass):
         if not isinstance(request[key], klass):
@@ -94,23 +101,38 @@ class JuggernautService(service.Service):
         for client in self.clients:
             client.transport.write("###\nMessage: %s\n###\n" % msg)
             
-    def subscribe_request(self, client, channels):
+    def subscribeRequest(self, client, channels):
         content_helper = RequestParamsHelper(client, channels, self)
-        request_task = web_client.getPage(self.config['subscription_url'], method="POST", postdata=content_helper.subscribe_params()) 
+        request_task = web_client.getPage(self.config['subscription_url'], method="POST", postdata=content_helper.subscribeParams()) 
+        
+        channel_id = channels[0]
         def appendClientToChannel(*a):
             try:
-                self.channels[channels[0]].append(client)
+                self.channels[channel_id].append(client)
+                log.msg(self.channels)
             except KeyError:
-                self.channels[channels[0]] = [ client ]
+                self.channels[channel_id] = [ client ]
+            client.channel_id = channel_id
+            
         def subscribeFail(err):
             log.err("Sending request failed %s" % str(err))
             client.transport.loseConnection()
-        
+        log.msg('a tu: %s' % str(channels[0]))
         request_task.addCallbacks(appendClientToChannel, subscribeFail)
         
-        return request_task 
-    
-    def clients_in_channel(self, channel):
+        return request_task
+        
+    def removeClient(self, client):
+        content_helper = RequestParamsHelper(client, [client.channel_id], self)
+        try:
+            self.channels[client.channel_id].remove(client)
+        except KeyError:
+            log.err("Removing client from channel failed! Channel %s not found!" % str(client.channel_id))
+        except ValueError:
+            log.err("Removing client from channel failed! Client not found in channel %s" % str(client.channel_id))
+        finally:
+            web_client.getPage(self.config['logout_url'], method="POST", postdata=content_helper.loggedOutParams())
+    def clientsInChannel(self, channel):
         try:
             return self.channels[channel]
         except KeyError:

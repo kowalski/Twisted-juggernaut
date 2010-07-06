@@ -18,6 +18,7 @@ class SubscribeTest(unittest.TestCase):
         self.webServer = MockWebServer()
         
     def tearDown(self):
+        self.webServer.waitForAllRequests()
         return defer.DeferredList([self.listeningPort.stopListening(), self.webServer.connector.stopListening()])
 
     def testNonJsonDissconnects(self):
@@ -30,44 +31,46 @@ class SubscribeTest(unittest.TestCase):
         return client.disconnectedEvent
         
     def testSubscribeSuccessful(self):
-        client = MockFlashClient()
+        self.webServer.expectRequests(2)
+        def onRequest((r, c)):
+            if c == 0:
+                self.assertEqual(r.content.read(), "client_id=1&session_id=1&channels[]=1")
+                self.assertEqual(r.prePathURL().split('/')[-1], 'subscribe')
+            r.finish()
+        self.webServer.requestHandler = onRequest
         
+        client = MockFlashClient()
         def sendMsg(a):
             client.connector.transport.write(client.subscribeMessage(1))
         defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
         
-        def onRequest(request):
-            self.assertEqual(request.content.read(), "client_id=1&session_id=1&channels[]=1")
-            self.assertEqual(request.prePathURL().split('/')[-1], 'subscribe')
-            request.finish()
-        defer2 = self.webServer.onRequest.addCallback(onRequest).addErrback(errorHandler)
-        
-        def assertsOnService():
+        def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 1)
             self.assertEqual(len(self.service.channels[1]), 1)
         task.deferLater(reactor, 0.05, assertsOnService
             ).addCallback(lambda _: client.connector.disconnect())
             
-        return client.disconnectedEvent
+        return self.webServer.getAllRequests()
         
     def testSubscribeDisconnectsWhenCodeNot200(self):
+        self.webServer.expectRequests(1)
         client = MockFlashClient()
         
         def sendMsg(a):
             client.connector.transport.write(client.subscribeMessage(1))
         defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
         
-        def onRequest(request):
+        def onRequest((request, counter)):
             self.assertEqual(request.content.read(), "client_id=1&session_id=1&channels[]=1")
             self.assertEqual(request.prePathURL().split('/')[-1], 'subscribe')
             request.setResponseCode(409)
             request.finish()
-        defer2 = self.webServer.onRequest.addCallback(onRequest).addErrback(errorHandler)
+        self.webServer.requestHandler = onRequest
         
-        return client.disconnectedEvent
+        return defer.DeferredList([self.webServer.getAllRequests(), client.disconnectedEvent])
         
     def testManySubscribers(self):
-        self.webServer.giveOnly200()
+        self.webServer.expectRequests(6)
         
         def sendMsg(client, id, channels):
             client.connector.transport.write(client.subscribeMessage(id, channels))
@@ -86,5 +89,7 @@ class SubscribeTest(unittest.TestCase):
             ).addCallback(lambda _: client1.connector.disconnect()
             ).addCallback(lambda _: client2.connector.disconnect()
             ).addCallback(lambda _: client3.connector.disconnect())
-            
-        return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
+
+        #self.webServer.waitForAllRequests()
+                    
+        return self.webServer.getAllRequests()#defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
