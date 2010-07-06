@@ -117,7 +117,6 @@ class JuggernautService(service.Service):
         def subscribeFail(err):
             log.err("Sending request failed %s" % str(err))
             client.transport.loseConnection()
-        log.msg('a tu: %s' % str(channels[0]))
         request_task.addCallbacks(appendClientToChannel, subscribeFail)
         
         return request_task

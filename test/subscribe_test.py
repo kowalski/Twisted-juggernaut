@@ -18,8 +18,9 @@ class SubscribeTest(unittest.TestCase):
         self.webServer = MockWebServer()
         
     def tearDown(self):
-        self.webServer.waitForAllRequests()
-        return defer.DeferredList([self.listeningPort.stopListening(), self.webServer.connector.stopListening()])
+        d = self.webServer.getAllRequests().addCallback(self.listeningPort.stopListening
+            ).addCallback(self.webServer.connector.stopListening)
+        return d
 
     def testNonJsonDissconnects(self):
         client = MockFlashClient()
@@ -50,7 +51,7 @@ class SubscribeTest(unittest.TestCase):
         task.deferLater(reactor, 0.05, assertsOnService
             ).addCallback(lambda _: client.connector.disconnect())
             
-        return self.webServer.getAllRequests()
+        return client.disconnectedEvent
         
     def testSubscribeDisconnectsWhenCodeNot200(self):
         self.webServer.expectRequests(1)
@@ -67,7 +68,7 @@ class SubscribeTest(unittest.TestCase):
             request.finish()
         self.webServer.requestHandler = onRequest
         
-        return defer.DeferredList([self.webServer.getAllRequests(), client.disconnectedEvent])
+        return client.disconnectedEvent
         
     def testManySubscribers(self):
         self.webServer.expectRequests(6)
@@ -90,6 +91,4 @@ class SubscribeTest(unittest.TestCase):
             ).addCallback(lambda _: client2.connector.disconnect()
             ).addCallback(lambda _: client3.connector.disconnect())
 
-        #self.webServer.waitForAllRequests()
-                    
-        return self.webServer.getAllRequests()#defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
+        return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])

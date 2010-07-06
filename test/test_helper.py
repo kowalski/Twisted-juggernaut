@@ -80,12 +80,6 @@ class MockWebServer:
 
     def expectRequests(self, num):
         self.deferList = map(lambda _: defer.Deferred(), range(num))
-    
-    @defer.deferredGenerator
-    def waitForAllRequests(self):
-        d = defer.waitForDeferred(self.getAllRequests())
-        yield d
-        d.getResult()
         
     def getAllRequests(self):
         return defer.DeferredList(self.deferList)
