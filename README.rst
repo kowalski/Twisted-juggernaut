@@ -7,7 +7,7 @@ This project is a rewrite of popular juggernaut server which ships with juggerna
  * Juggernaut seems to be perfectly suited to for the first Twisted project
  * Existing juggernaut server code is...  far from being readable. I thought it would be nice to port juggernaut not to use flash socket connections. I plan to serve the same protocol through the websocket. This could work nice with IPads, IPhones and so on.
  
-Feautures of this implemenetation
+Feautures of this implementation
 =================================
 
 My plan is to make this server as simillar to Juggernaut as possible. But frankly there are some things in original Juggernaut implemenetation that I do not like at all. So below I list feautures I _do not_ plan to include in this implementation:
