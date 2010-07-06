@@ -3,6 +3,7 @@ from twisted.internet import reactor
 from twisted.web import resource, server
 import juggernaut
 from twisted.python import log
+from twisted.trial.unittest import FailTest
 
 import json
 
@@ -48,7 +49,7 @@ class ChildResource(resource.Resource):
         
     def render_POST(self, request):
         if self.webserver.counter >= len(self.webserver.deferList):
-            raise Exception("Request not expected %s!" % str(request))
+            raise FailTest("Request not expected %s!" % str(request))
         self.webserver.requests.append(request)
         
         def defaultHandler((r, c)):
