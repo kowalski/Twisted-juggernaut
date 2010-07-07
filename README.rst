@@ -13,8 +13,7 @@ Feautures of this implementation
 My plan is to make this server as simillar to Juggernaut as possible. But frankly there are some things in original Juggernaut implemenetation that I do not like at all. So below I list feautures I _do not_ plan to include in this implementation:
  * Clients can listen only to one channel. Original subscribe command allowed passing an array of channels, but I'm not even sure this worked. At least not with Rails. In my implementation only a single channel is allowed (though API stays the same)
  * Clients cannot broadcast. There is no broadcast request. Any client with ip not listed in allowed_ips will be disconneted imediatly. 
- * There is no logout connection request. This is something I did't quite understand in original Juggernaut. It seems author wanted to enable the possibility of clients reconnecting, but hit the wall. So in my implementation there is only one request, which is the logout request. This is performed imediatly after the client connection was closed. Simple, huh ?
- 
+
 On the other hand there are some features not available in original implementation which I plan to include:
  * Subscribe action can render a json with form [ msg1, msg2, msg3 ]. Theese messages will be sent to newly subscribed client.
  * Deadlock problem solved. Now you can query juggernaut, send messages, etc from inside subscribe/disconneted/logged_out actions without risking the deadlock. This was one of the most annoying bugs of original implementation.

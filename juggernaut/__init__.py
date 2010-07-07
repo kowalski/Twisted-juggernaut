@@ -18,6 +18,7 @@ class JuggernautProtocol(protocol.Protocol):
         self.channel_id = None
         self.client_id = None
         self.session_id = None
+        self.markedAsDead = False
         
     def dataReceived(self, data):
         self.buffer += data
@@ -65,8 +66,10 @@ class JuggernautProtocol(protocol.Protocol):
         
     def connectionLost(self, reason):
         log.msg('Connection lost channel_id %s' % str(self.channel_id))
+        self.markedAsDead = True
         if self.channel_id:
-            self.factory.service.removeClient(self)
+            self.factory.service.disconnectedRequest(self, [self.channel_id])    
+            #self.factory.service.removeClient(self)
 
     def _checkExists(self, request, key, klass):
         if not isinstance(request[key], klass):
@@ -120,6 +123,10 @@ class JuggernautService(service.Service):
         
         return request_task
         
+    def disconnectedRequest(self, client, channels):
+        content_helper = RequestParamsHelper(client, [client.channel_id], self)
+        web_client.getPage(self.config['logout_connection_url'], method="POST", postdata=content_helper.disconnectedParams())
+        
     def removeClient(self, client):
         content_helper = RequestParamsHelper(client, [client.channel_id], self)
         try:
@@ -129,7 +136,7 @@ class JuggernautService(service.Service):
         except ValueError:
             log.err("Removing client from channel failed! Client not found in channel %s" % str(client.channel_id))
         finally:
-            web_client.getPage(self.config['logout_url'], method="POST", postdata=content_helper.loggedOutParams())
+            pass
     def clientsInChannel(self, channel):
         try:
             return self.channels[channel]

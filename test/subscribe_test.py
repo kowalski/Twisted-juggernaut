@@ -39,7 +39,7 @@ class SubscribeTest(unittest.TestCase):
                 self.assertEqual(r.prePathURL().split('/')[-1], 'subscribe')
             elif c == 1:
                 self.assertEqual(r.content.read(), "client_id=1&session_id=1&channels[]=1")
-                self.assertEqual(r.prePathURL().split('/')[-1], 'logged_out')
+                self.assertEqual(r.prePathURL().split('/')[-1], 'disconnected')
             r.finish()
         self.webServer.requestHandler = onRequest
         

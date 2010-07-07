@@ -8,7 +8,8 @@ class RequestParamsHelper:
         params = []
         params.append("client_id=%s" % str(self.client.client_id))
         params.append("session_id=%s" % str(self.client.session_id))
-        params.append("channels[]=%s" % str(self.channels[0]))
+        if len(self.channels) > 0:
+            params.append("channels[]=%s" % str(self.channels[0]))
         return params
     
     def subscribeParams(self):
@@ -20,6 +21,6 @@ class RequestParamsHelper:
             
         return '&'.join(params)
         
-    def loggedOutParams(self):
+    def disconnectedParams(self):
         params = self._commonParams()
         return '&'.join(params)
