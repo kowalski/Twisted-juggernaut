@@ -83,7 +83,10 @@ class MockWebServer:
         self.deferList = map(lambda _: defer.Deferred(), range(num))
         
     def getAllRequests(self):
-        return defer.DeferredList(self.deferList)
+        return self.getNFirstRequests(len(self.deferList))
 
+    def getNFirstRequests(self, num):
+        return defer.DeferredList(self.deferList[0:num])
+    
 def errorHandler(a):
     log.err(str(a))

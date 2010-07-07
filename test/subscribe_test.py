@@ -74,6 +74,8 @@ class SubscribeTest(unittest.TestCase):
         return client.disconnectedEvent
         
     def testManySubscribers(self):
+        """Subscribe 3 clients, expects 9 reqeusts 3x subscribe, 3x disconnect, 3x logged_out
+        Check that service records correct data at each step"""
         self.webServer.expectRequests(6)
         
         def sendMsg(client, id, channels):
@@ -85,7 +87,7 @@ class SubscribeTest(unittest.TestCase):
         client2.connectedEvent.addCallback(lambda _: sendMsg(client2, 2, [1]))
         client3.connectedEvent.addCallback(lambda _: sendMsg(client3, 3, [2]))
         
-        def assertsOnService():
+        def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 2)
             self.assertEqual(len(self.service.channels[1]), 2)
             self.assertEqual(len(self.service.channels[2]), 1)
@@ -94,4 +96,10 @@ class SubscribeTest(unittest.TestCase):
             ).addCallback(lambda _: client2.connector.disconnect()
             ).addCallback(lambda _: client3.connector.disconnect())
 
+        def assertClientsDead(*a):
+            for channel in self.service.channels.values():
+                for client in channel:
+                    self.assertTrue(client.markedAsDead)
+        self.webServer.getNFirstRequests(6).addCallback(assertsOnService #clients are not removed from channels yet, only marked as dead
+            ).addCallback(assertClientsDead)
         return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
