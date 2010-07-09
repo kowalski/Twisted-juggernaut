@@ -99,7 +99,7 @@ class SubscribeTest(unittest.TestCase):
         def assertClientsDead(*a):
             for channel in self.service.channels.values():
                 for client in channel:
-                    self.assertTrue(client.markedAsDead)
+                    self.assertFalse(client.is_alive)
         self.webServer.getNFirstRequests(6).addCallback(assertsOnService #clients are not removed from channels yet, only marked as dead
             ).addCallback(assertClientsDead)
         return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
