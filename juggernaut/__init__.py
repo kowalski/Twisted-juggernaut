@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from twisted.application import service, internet
-from twisted.internet import protocol, defer
+from twisted.internet import protocol, defer, reactor
 from twisted.python import log, components
 from twisted.web import client as web_client
 from zope.interface import implements, Interface
@@ -25,6 +25,7 @@ class JuggernautClient():
         self.session_id = session_id
         self.is_alive = True
         self.service = self.connector.factory.service
+        self.logoutTaskCall = None
         
         self.service.subscribeRequest(self, [channel_id])
 
@@ -33,6 +34,13 @@ class JuggernautClient():
         self.connector = None
         if self.channel_id:
             self.service.disconnectedRequest(self, [self.channel_id])
+        self.logoutTaskCall = reactor.callLater(self.service.config['timeout'], self.service.logoutRequest, self)
+            
+    def markAlive(self, connector):
+        self.connector = connector
+        self.is_alive = True
+        if self.logoutTaskCall:
+            self.logoutTaskCall.cancel()
 
 class IJuggernautProtocol(Interface):
     pass
@@ -118,7 +126,7 @@ class JuggernautService(service.Service):
             found_client = self.clients[client_id]  # TODO: Make it somehow secure. Now connection can be kidnappned
             if found_client.is_alive:
                 raise Exception("Client with id %s already logged in" % str(client_id))
-            found_client.connector = connector
+            found_client.markAlive(connector)
             return found_client
         except KeyError:
             new_client = JuggernautClient(connector, client_id, session_id, channel_id)
@@ -147,6 +155,10 @@ class JuggernautService(service.Service):
     def disconnectedRequest(self, client, channels):
         content_helper = RequestParamsHelper(client, [client.channel_id], self)
         web_client.getPage(self.config['logout_connection_url'], method="POST", postdata=content_helper.disconnectedParams())
+    
+    def logoutRequest(self, client):
+        content_helper = RequestParamsHelper(client, [client.channel_id], self)
+        web_client.getPage(self.config['logout_url'], method="POST", postdata=content_helper.disconnectedParams())
         
     def removeClient(self, client):
         content_helper = RequestParamsHelper(client, [client.channel_id], self)

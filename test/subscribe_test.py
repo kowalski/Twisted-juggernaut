@@ -32,7 +32,7 @@ class SubscribeTest(unittest.TestCase):
         return client.disconnectedEvent
         
     def testSubscribeSuccessful(self):
-        self.webServer.expectRequests(2)
+        self.webServer.expectRequests(3)
         def onRequest((r, c)):
             if c == 0:
                 self.assertEqual(r.content.read(), "client_id=1&session_id=1&channels[]=1")
@@ -57,7 +57,7 @@ class SubscribeTest(unittest.TestCase):
         return client.disconnectedEvent
         
     def testSubscribeDisconnectsWhenCodeNot200(self):
-        self.webServer.expectRequests(1)
+        self.webServer.expectRequests(2)
         client = MockFlashClient()
         
         def sendMsg(a):
@@ -65,9 +65,12 @@ class SubscribeTest(unittest.TestCase):
         defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
         
         def onRequest((request, counter)):
-            self.assertEqual(request.content.read(), "client_id=1&session_id=1&channels[]=1")
-            self.assertEqual(request.prePathURL().split('/')[-1], 'subscribe')
-            request.setResponseCode(409)
+            if counter == 0:
+                self.assertEqual(request.content.read(), "client_id=1&session_id=1&channels[]=1")
+                self.assertEqual(request.prePathURL().split('/')[-1], 'subscribe')
+                request.setResponseCode(409)
+            else:
+                request.setResponseCode(200)
             request.finish()
         self.webServer.requestHandler = onRequest
         
@@ -76,7 +79,7 @@ class SubscribeTest(unittest.TestCase):
     def testManySubscribers(self):
         """Subscribe 3 clients, expects 9 reqeusts 3x subscribe, 3x disconnect, 3x logged_out
         Check that service records correct data at each step"""
-        self.webServer.expectRequests(6)
+        self.webServer.expectRequests(9)
         
         def sendMsg(client, id, channels):
             client.connector.transport.write(client.subscribeMessage(id, channels))
@@ -107,7 +110,7 @@ class SubscribeTest(unittest.TestCase):
         return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
                 
     def testIdIsUnique(self):
-        self.webServer.expectRequests(2)
+        self.webServer.expectRequests(3)
         
         def sendMsg(client, id, channels):
             client.connector.transport.write(client.subscribeMessage(id, channels))
