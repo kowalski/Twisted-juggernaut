@@ -79,7 +79,7 @@ class JuggernautProtocol(protocol.Protocol):
         if len(request['channels']) != 1:
             raise ValueError("You can pass only one channel to subscribe to!")
     
-        self.client = JuggernautClient(self, request['client_id'], request['session_id'], request['channels'][0])
+        self.client = self.factory.service.findOrCreateClient(self, request['client_id'], request['session_id'], request['channels'][0])
             
     def connectionLost(self, reason):
         if self.client:
@@ -111,6 +111,19 @@ class JuggernautService(service.Service):
     def __init__(self, options):
         self.channels = {}
         self.config = options
+        self.clients = {}
+    
+    def findOrCreateClient(self, connector, client_id, session_id, channel_id):
+        try: 
+            found_client = self.clients[client_id]  # TODO: Make it somehow secure. Now connection can be kidnappned
+            if found_client.is_alive:
+                raise Exception("Client with id %s already logged in" % str(client_id))
+            found_client.connector = connector
+            return found_client
+        except KeyError:
+            new_client = JuggernautClient(connector, client_id, session_id, channel_id)
+            self.clients[client_id] = new_client
+            return new_client
     
     def subscribeRequest(self, client, channels):
         content_helper = RequestParamsHelper(client, channels, self)
