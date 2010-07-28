@@ -107,6 +107,11 @@ class SubscribeTest(unittest.TestCase):
                     self.assertFalse(client.is_alive)
         self.webServer.getNFirstRequests(6).addCallback(assertsOnService #clients are not removed from channels yet, only marked as dead
             ).addCallback(assertClientsDead)
+            
+        def assertClientsRemoved(*a):
+            self.assertEqual(len(self.service.channels.keys()), 0)
+            self.assertEqual(len(self.service.clients.keys()), 0)
+        self.webServer.getAllRequests().addCallback(assertClientsRemoved)
         return defer.DeferredList([client1.disconnectedEvent, client2.disconnectedEvent, client3.disconnectedEvent])
                 
     def testIdIsUnique(self):
@@ -117,7 +122,8 @@ class SubscribeTest(unittest.TestCase):
         client1 = MockFlashClient()
         client2 = MockFlashClient()
         client1.connectedEvent.addCallback(lambda _: sendMsg(client1, 1, [1]))
-        client2.connectedEvent.addCallback(lambda _: sendMsg(client2, 1, [2]))
+        task.deferLater(reactor, 0.01, sendMsg, client2, 1, [2]) # make sure this message is handled second 
+        
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 1)
             self.assertEqual(len(self.service.channels[1]), 1)

@@ -159,17 +159,24 @@ class JuggernautService(service.Service):
     def logoutRequest(self, client):
         content_helper = RequestParamsHelper(client, [client.channel_id], self)
         web_client.getPage(self.config['logout_url'], method="POST", postdata=content_helper.disconnectedParams())
+        self.removeClient(client)
         
     def removeClient(self, client):
         content_helper = RequestParamsHelper(client, [client.channel_id], self)
         try:
             self.channels[client.channel_id].remove(client)
+            if len(self.channels[client.channel_id]) == 0:
+                log.msg("Removing channel %s" % str(client.channel_id))
+                del(self.channels[client.channel_id])
         except KeyError:
             log.err("Removing client from channel failed! Channel %s not found!" % str(client.channel_id))
         except ValueError:
             log.err("Removing client from channel failed! Client not found in channel %s" % str(client.channel_id))
-        finally:
-            pass
+        try:
+            del(self.clients[client.client_id])
+        except KeyError:
+            log.error("Removing client failed. Client with id %s not found!" % str(client.client_id))
+        
     def clientsInChannel(self, channel):
         try:
             return self.channels[channel]
