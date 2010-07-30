@@ -26,12 +26,11 @@ class JuggernautClient():
         self.is_alive = True
         self.service = self.connector.factory.service
         self.logoutTaskCall = None
-        
-        self.service.subscribeRequest(self, [channel_id])
 
     def markDead(self):
         self.is_alive = False
         self.connector = None
+        log.msg('Marked dead client_id=%s, channel_id=%s' % (str(self.client_id), str(self.channel_id)))
         if self.channel_id:
             self.service.disconnectedRequest(self, [self.channel_id])
         self.logoutTaskCall = reactor.callLater(self.service.config['timeout'], self.service.logoutRequest, self)
@@ -39,6 +38,7 @@ class JuggernautClient():
     def markAlive(self, connector):
         self.connector = connector
         self.is_alive = True
+        
         if self.logoutTaskCall:
             self.logoutTaskCall.cancel()
 
@@ -88,6 +88,7 @@ class JuggernautProtocol(protocol.Protocol):
             raise ValueError("You can pass only one channel to subscribe to!")
     
         self.client = self.factory.service.findOrCreateClient(self, request['client_id'], request['session_id'], request['channels'][0])
+        self.factory.service.subscribeRequest(self.client, [request['channels'][0]])
             
     def connectionLost(self, reason):
         if self.client:

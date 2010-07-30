@@ -15,7 +15,7 @@ class TestConfig:
         'subscription_url': 'http://localhost:8080/subscribe',
         'logout_connection_url': 'http://localhost:8080/disconnected',
         'logout_url': 'http://localhost:8080/logged_out',
-        'timeout': 0.01
+        'timeout': 0.02
     }
 
 class ClientProtocol(protocol.Protocol):
