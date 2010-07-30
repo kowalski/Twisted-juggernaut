@@ -159,3 +159,28 @@ class SubscribeTest(unittest.TestCase):
         reactor.callLater(0.03, connectAnotherClient, reconnecting_client)
         
         return reconnecting_client.disconnectedEvent
+        
+    def testReconnectAfterTheTimeout(self):
+        self.webServer.expectRequests(6)
+        
+        def onRequest((request, counter)):
+            expectations = [ 'subscribe', 'disconnected', 'logged_out', 'subscribe', 'disconnected', 'logged_out' ]
+            self.assertEqual(request.prePathURL().split('/')[-1], expectations[counter], "Counter %d" % counter)
+            request.setResponseCode(200)
+            request.finish()
+        self.webServer.requestHandler = onRequest
+        
+        first_client = MockFlashClient()
+        def sendMsg(client, id, channels):
+            client.connector.transport.write(client.subscribeMessage(id, channels))
+        
+        reconnecting_client = MockFlashClient()
+        def connectAnotherClient(client):
+            client.connectedEvent.addCallback(lambda _: sendMsg(client, 1, [1]))
+            task.deferLater(reactor, 0.02, client.connector.disconnect)
+        
+        first_client.connectedEvent.addCallback(lambda _: sendMsg(first_client, 1, [1]))
+        reactor.callLater(0.02, first_client.connector.disconnect)
+        reactor.callLater(0.06, connectAnotherClient, reconnecting_client)
+        
+        return reconnecting_client.disconnectedEvent
