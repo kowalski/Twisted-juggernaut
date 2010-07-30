@@ -41,9 +41,26 @@ class JuggernautClient():
         
         if self.logoutTaskCall:
             self.logoutTaskCall.cancel()
+            
+    def sendMessage(self, body):
+        msg = Message(body)
+        log.msg("Sending message to client_id=%s body=%s" % (str(self.client_id), str(msg)))
+        
+        self.connector.transport.write(str(msg) + JuggernautProtocol.CR)
 
 class IJuggernautProtocol(Interface):
     pass
+
+class Message:
+    current_id = 0
+    
+    def __init__(self, body):
+        self.body = body
+        self.id = self.current_id 
+        self.current_id += 1
+
+    def __str__(self):
+        return json.dumps({'id': self.id, 'body': self.body})
 
 components.registerAdapter(JuggernautClient, IJuggernautClient, IJuggernautProtocol)
       
@@ -90,6 +107,18 @@ class JuggernautProtocol(protocol.Protocol):
         self.client = self.factory.service.findOrCreateClient(self, request['client_id'], request['session_id'], request['channels'][0])
         self.factory.service.subscribeRequest(self.client, [request['channels'][0]])
             
+            
+    def broadcastCommand(self, request):
+        log.msg("BROADCAST: %s" % str(request))
+        
+        self._checkExists(request, 'type', unicode)
+        self._checkExists(request, 'body', unicode)
+        
+        self.factory.service.authenticateBroadcastOrQuery(self, request)
+        
+        method = getattr(self.factory.service, 'broadcast_' + request['type'])
+        method(request)
+        
     def connectionLost(self, reason):
         if self.client:
             self.client.markDead()
@@ -183,6 +212,28 @@ class JuggernautService(service.Service):
             return self.channels[channel]
         except KeyError:
             return []
+
+    def authenticateBroadcastOrQuery(self, connector, request):
+        ip = connector.transport.getHost().host
+        if self.config['allowed_ips'].__contains__(ip):
+            return true
+        else:
+            raise Exception('Dissalowed request %s from %s' % (str(request), str(ip)))
+        
+    def broadcast_to_channels(self, request):
+        ids_to_send = []
+        for channel in request['channels']:
+            map(lambda x: ids_to_send.append(x), self.clientsInChannel(channel))
+        
+        request['client_ids'] = ids_to_send
+        self.broadcast_to_clients(self, request)
+         
+    def broadcast_to_clients(self, request):
+        for client_id in request['client_ids']:
+            try:
+                self.clients[client_id].sendMessage(request['body'])
+            except KeyError:
+                log.error('Client with id %s not found!' % client_id)
 
 components.registerAdapter(JuggernautService, IJuggernautService, service.IService)
 

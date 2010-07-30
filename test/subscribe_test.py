@@ -44,9 +44,7 @@ class SubscribeTest(unittest.TestCase):
         self.webServer.requestHandler = onRequest
         
         client = MockFlashClient()
-        def sendMsg(a):
-            client.connector.transport.write(client.subscribeMessage(1))
-        defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
+        defer1 = client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1)).addErrback(errorHandler)
         
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 1)
@@ -60,9 +58,7 @@ class SubscribeTest(unittest.TestCase):
         self.webServer.expectRequests(2)
         client = MockFlashClient()
         
-        def sendMsg(a):
-            client.connector.transport.write(client.subscribeMessage(1))
-        defer1 = client.connectedEvent.addCallback(sendMsg).addErrback(errorHandler)
+        defer1 = client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1)).addErrback(errorHandler)
         
         def onRequest((request, counter)):
             if counter == 0:
@@ -81,14 +77,12 @@ class SubscribeTest(unittest.TestCase):
         Check that service records correct data at each step"""
         self.webServer.expectRequests(9)
         
-        def sendMsg(client, id, channels):
-            client.connector.transport.write(client.subscribeMessage(id, channels))
         client1 = MockFlashClient()
         client2 = MockFlashClient()
         client3 = MockFlashClient()
-        client1.connectedEvent.addCallback(lambda _: sendMsg(client1, 1, [1]))
-        client2.connectedEvent.addCallback(lambda _: sendMsg(client2, 2, [1]))
-        client3.connectedEvent.addCallback(lambda _: sendMsg(client3, 3, [2]))
+        client1.connectedEvent.addCallback(lambda _: client1.sendSubscribeMessage(1, [1]))
+        client2.connectedEvent.addCallback(lambda _: client2.sendSubscribeMessage(2, [1]))
+        client3.connectedEvent.addCallback(lambda _: client3.sendSubscribeMessage(3, [2]))
         
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 2)
@@ -117,12 +111,10 @@ class SubscribeTest(unittest.TestCase):
     def testIdIsUnique(self):
         self.webServer.expectRequests(3)
         
-        def sendMsg(client, id, channels):
-            client.connector.transport.write(client.subscribeMessage(id, channels))
         client1 = MockFlashClient()
         client2 = MockFlashClient()
-        client1.connectedEvent.addCallback(lambda _: sendMsg(client1, 1, [1]))
-        task.deferLater(reactor, 0.01, sendMsg, client2, 1, [2]) # make sure this message is handled second 
+        client1.connectedEvent.addCallback(lambda _: client1.sendSubscribeMessage(1, [1]))
+        task.deferLater(reactor, 0.01, client2.sendSubscribeMessage, 1, [2]) # make sure this message is handled second 
         
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 1)
@@ -146,15 +138,12 @@ class SubscribeTest(unittest.TestCase):
         self.webServer.requestHandler = onRequest
         
         first_client = MockFlashClient()
-        def sendMsg(client, id, channels):
-            client.connector.transport.write(client.subscribeMessage(id, channels))
-        
         reconnecting_client = MockFlashClient()
         def connectAnotherClient(client):
-            client.connectedEvent.addCallback(lambda _: sendMsg(client, 1, [1]))
+            client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1, [1]))
             task.deferLater(reactor, 0.02, client.connector.disconnect)
         
-        first_client.connectedEvent.addCallback(lambda _: sendMsg(first_client, 1, [1]))
+        first_client.connectedEvent.addCallback(lambda _: first_client.sendSubscribeMessage(1, [1]))
         reactor.callLater(0.02, first_client.connector.disconnect)
         reactor.callLater(0.03, connectAnotherClient, reconnecting_client)
         
@@ -171,16 +160,17 @@ class SubscribeTest(unittest.TestCase):
         self.webServer.requestHandler = onRequest
         
         first_client = MockFlashClient()
-        def sendMsg(client, id, channels):
-            client.connector.transport.write(client.subscribeMessage(id, channels))
-        
         reconnecting_client = MockFlashClient()
+        
         def connectAnotherClient(client):
-            client.connectedEvent.addCallback(lambda _: sendMsg(client, 1, [1]))
+            client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1, [1]))
             task.deferLater(reactor, 0.02, client.connector.disconnect)
         
-        first_client.connectedEvent.addCallback(lambda _: sendMsg(first_client, 1, [1]))
+        first_client.connectedEvent.addCallback(lambda _: first_client.sendSubscribeMessage(1, [1]))
         reactor.callLater(0.02, first_client.connector.disconnect)
         reactor.callLater(0.06, connectAnotherClient, reconnecting_client)
         
         return reconnecting_client.disconnectedEvent
+        
+    def testBroadcastToChannels(self):
+        pass

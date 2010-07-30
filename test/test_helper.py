@@ -43,6 +43,21 @@ class MockFlashClient:
             'channels': channels
         }
         return json.dumps(handshake) + "\0"
+    
+    def sendSubscribeMessage(self, id, channels=[1]):
+        self.connector.transport.write(self.subscribeMessage(id, channels))
+        
+    def broadcastToChannelsMessage(self, body, channels):
+        payload = {
+            'command': 'broadcast',
+            'type': 'to_channels',
+            'channels': channels,
+            'body': body
+        }
+        return json.dumps(payload) + "\0"
+        
+    def sendBroadcastToChannelsMessage(self, body, channels):
+        self.connector.transport.write(self.broadcastToChannelsMessage(body, channels))
         
 class ChildResource(resource.Resource):
     def __init__(self, webserver):
