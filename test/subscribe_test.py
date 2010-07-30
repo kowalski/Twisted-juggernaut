@@ -1,4 +1,3 @@
-from twisted.trial import unittest
 from twisted.python import log
 from twisted.internet import protocol, defer, task, reactor
 import juggernaut
@@ -7,20 +6,7 @@ import sys
 sys.path.append('test')
 from test_helper import *
 
-class SubscribeTest(unittest.TestCase):
-    timeout = 5
-    
-    def setUp(self):
-        self.service = juggernaut.makeService(TestConfig.config)
-        factory = juggernaut.IJuggernautFactory(self.service)
-        self.listeningPort = reactor.listenTCP(TestConfig.config['port'], factory)
-        
-        self.webServer = MockWebServer()
-        
-    def tearDown(self):
-        d = self.webServer.getAllRequests().addCallback(self.listeningPort.stopListening
-            ).addCallback(self.webServer.connector.stopListening)
-        return d
+class SubscribeTest(JuggernautTest):
 
     def testNonJsonDissconnects(self):
         client = MockFlashClient()
@@ -172,5 +158,3 @@ class SubscribeTest(unittest.TestCase):
         
         return reconnecting_client.disconnectedEvent
         
-    def testBroadcastToChannels(self):
-        pass

@@ -1,3 +1,4 @@
+from twisted.trial import unittest
 from twisted.internet import protocol, defer
 from twisted.internet import reactor
 from twisted.web import resource, server
@@ -6,6 +7,22 @@ from twisted.python import log
 from twisted.trial.unittest import FailTest
 
 import json
+
+class JuggernautTest(unittest.TestCase):
+    timeout = 5
+    
+    def setUp(self):
+        self.service = juggernaut.makeService(TestConfig.config)
+        factory = juggernaut.IJuggernautFactory(self.service)
+        self.listeningPort = reactor.listenTCP(TestConfig.config['port'], factory)
+        
+        self.webServer = MockWebServer()
+        
+    def tearDown(self):
+        d = self.webServer.getAllRequests().addCallback(self.listeningPort.stopListening
+            ).addCallback(self.webServer.connector.stopListening)
+        return d
+
 
 class TestConfig:
     config = {
