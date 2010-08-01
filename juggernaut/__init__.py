@@ -205,7 +205,7 @@ class JuggernautService(service.Service):
         try:
             del(self.clients[client.client_id])
         except KeyError:
-            log.error("Removing client failed. Client with id %s not found!" % str(client.client_id))
+            log.err("Removing client failed. Client with id %s not found!" % str(client.client_id))
         
     def clientsInChannel(self, channel):
         try:
@@ -216,24 +216,24 @@ class JuggernautService(service.Service):
     def authenticateBroadcastOrQuery(self, connector, request):
         ip = connector.transport.getHost().host
         if self.config['allowed_ips'].__contains__(ip):
-            return true
+            return True
         else:
             raise Exception('Dissalowed request %s from %s' % (str(request), str(ip)))
         
     def broadcast_to_channels(self, request):
         ids_to_send = []
         for channel in request['channels']:
-            map(lambda x: ids_to_send.append(x), self.clientsInChannel(channel))
+            map(lambda x: ids_to_send.append(x.client_id), self.clientsInChannel(channel))
         
         request['client_ids'] = ids_to_send
-        self.broadcast_to_clients(self, request)
+        self.broadcast_to_clients(request)
          
     def broadcast_to_clients(self, request):
         for client_id in request['client_ids']:
             try:
                 self.clients[client_id].sendMessage(request['body'])
             except KeyError:
-                log.error('Client with id %s not found!' % client_id)
+                log.err('Client with id %s not found!' % client_id)
 
 components.registerAdapter(JuggernautService, IJuggernautService, service.IService)
 

@@ -41,7 +41,6 @@ class ClientProtocol(protocol.Protocol):
     
     def __init__(self):
         self.buffer = ""
-        self.client = None
         self.messages = []
         
     def dataReceived(self, data):
@@ -52,7 +51,7 @@ class ClientProtocol(protocol.Protocol):
             self.buffer = split.pop()
     
         for message in split:
-            messages.append(message)
+            self.messages.append(message)
         
     def connectionMade(self):
         self.factory.onConnectionMade.callback(self)
@@ -62,7 +61,7 @@ class ClientProtocol(protocol.Protocol):
         
 
 class MockFlashClient:
-    def __init__(self, client_id):
+    def __init__(self, client_id=None):
         factory = protocol.ClientFactory()
         factory.protocol = ClientProtocol
         self.connectedEvent = defer.Deferred()
