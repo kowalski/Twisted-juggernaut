@@ -6,7 +6,7 @@ import juggernaut
 from twisted.python import log
 from twisted.trial.unittest import FailTest
 
-import json
+import json, re
 
 class JuggernautTest(unittest.TestCase):
     timeout = 5
@@ -36,21 +36,42 @@ class TestConfig:
     }
 
 class ClientProtocol(protocol.Protocol):
+    CR = "\0"
+    CR_END = re.compile(CR + '$')
+    
+    def __init__(self):
+        self.buffer = ""
+        self.client = None
+        self.messages = []
+        
+    def dataReceived(self, data):
+        self.buffer += data
+        split = self.buffer.split(self.CR)
+        
+        if not self.CR_END.match(self.buffer):
+            self.buffer = split.pop()
+    
+        for message in split:
+            messages.append(message)
+        
     def connectionMade(self):
         self.factory.onConnectionMade.callback(self)
 
     def connectionLost(self, *a):
         self.factory.onConnectionLost.callback(self)
+        
 
 class MockFlashClient:
-    def __init__(self, host=TestConfig.config['host'], port=TestConfig.config['port']):
+    def __init__(self, client_id):
         factory = protocol.ClientFactory()
         factory.protocol = ClientProtocol
         self.connectedEvent = defer.Deferred()
         self.disconnectedEvent = defer.Deferred()
         factory.onConnectionMade = self.connectedEvent 
         factory.onConnectionLost = self.disconnectedEvent 
-        self.connector = reactor.connectTCP(host, port, factory)
+        self.connector = reactor.connectTCP(TestConfig.config['host'], TestConfig.config['port'], factory)
+        
+        self.id = client_id
         
     def subscribeMessage(self, id, channels=[1]):
         handshake = {
@@ -61,8 +82,8 @@ class MockFlashClient:
         }
         return json.dumps(handshake) + "\0"
     
-    def sendSubscribeMessage(self, id, channels=[1]):
-        self.connector.transport.write(self.subscribeMessage(id, channels))
+    def sendSubscribeMessage(self, channels=[1]):
+        self.connector.transport.write(self.subscribeMessage(self.id, channels))
         
     def broadcastToChannelsMessage(self, body, channels):
         payload = {

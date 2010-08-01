@@ -9,7 +9,7 @@ from test_helper import *
 class SubscribeTest(JuggernautTest):
 
     def testNonJsonDissconnects(self):
-        client = MockFlashClient()
+        client = MockFlashClient(1)
         
         def sendMsg(a):
             client.connector.transport.write('czesc\0')
@@ -29,8 +29,8 @@ class SubscribeTest(JuggernautTest):
             r.finish()
         self.webServer.requestHandler = onRequest
         
-        client = MockFlashClient()
-        defer1 = client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1)).addErrback(errorHandler)
+        client = MockFlashClient(1)
+        defer1 = client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage()).addErrback(errorHandler)
         
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 1)
@@ -42,9 +42,9 @@ class SubscribeTest(JuggernautTest):
         
     def testSubscribeDisconnectsWhenCodeNot200(self):
         self.webServer.expectRequests(2)
-        client = MockFlashClient()
+        client = MockFlashClient(1)
         
-        defer1 = client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1)).addErrback(errorHandler)
+        defer1 = client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage()).addErrback(errorHandler)
         
         def onRequest((request, counter)):
             if counter == 0:
@@ -63,12 +63,12 @@ class SubscribeTest(JuggernautTest):
         Check that service records correct data at each step"""
         self.webServer.expectRequests(9)
         
-        client1 = MockFlashClient()
-        client2 = MockFlashClient()
-        client3 = MockFlashClient()
-        client1.connectedEvent.addCallback(lambda _: client1.sendSubscribeMessage(1, [1]))
-        client2.connectedEvent.addCallback(lambda _: client2.sendSubscribeMessage(2, [1]))
-        client3.connectedEvent.addCallback(lambda _: client3.sendSubscribeMessage(3, [2]))
+        client1 = MockFlashClient(1)
+        client2 = MockFlashClient(2)
+        client3 = MockFlashClient(3)
+        client1.connectedEvent.addCallback(lambda _: client1.sendSubscribeMessage([1]))
+        client2.connectedEvent.addCallback(lambda _: client2.sendSubscribeMessage([1]))
+        client3.connectedEvent.addCallback(lambda _: client3.sendSubscribeMessage([2]))
         
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 2)
@@ -97,10 +97,10 @@ class SubscribeTest(JuggernautTest):
     def testIdIsUnique(self):
         self.webServer.expectRequests(3)
         
-        client1 = MockFlashClient()
-        client2 = MockFlashClient()
-        client1.connectedEvent.addCallback(lambda _: client1.sendSubscribeMessage(1, [1]))
-        task.deferLater(reactor, 0.01, client2.sendSubscribeMessage, 1, [2]) # make sure this message is handled second 
+        client1 = MockFlashClient(1)
+        client2 = MockFlashClient(1)
+        client1.connectedEvent.addCallback(lambda _: client1.sendSubscribeMessage([1]))
+        task.deferLater(reactor, 0.01, client2.sendSubscribeMessage, [2]) # make sure this message is handled second 
         
         def assertsOnService(*a):
             self.assertEqual(len(self.service.channels.keys()), 1)
@@ -123,13 +123,13 @@ class SubscribeTest(JuggernautTest):
             request.finish()
         self.webServer.requestHandler = onRequest
         
-        first_client = MockFlashClient()
-        reconnecting_client = MockFlashClient()
+        first_client = MockFlashClient(1)
+        reconnecting_client = MockFlashClient(1)
         def connectAnotherClient(client):
-            client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1, [1]))
+            client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage([1]))
             task.deferLater(reactor, 0.02, client.connector.disconnect)
         
-        first_client.connectedEvent.addCallback(lambda _: first_client.sendSubscribeMessage(1, [1]))
+        first_client.connectedEvent.addCallback(lambda _: first_client.sendSubscribeMessage([1]))
         reactor.callLater(0.02, first_client.connector.disconnect)
         reactor.callLater(0.03, connectAnotherClient, reconnecting_client)
         
@@ -145,14 +145,14 @@ class SubscribeTest(JuggernautTest):
             request.finish()
         self.webServer.requestHandler = onRequest
         
-        first_client = MockFlashClient()
-        reconnecting_client = MockFlashClient()
+        first_client = MockFlashClient(1)
+        reconnecting_client = MockFlashClient(1)
         
         def connectAnotherClient(client):
-            client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage(1, [1]))
+            client.connectedEvent.addCallback(lambda _: client.sendSubscribeMessage([1]))
             task.deferLater(reactor, 0.02, client.connector.disconnect)
         
-        first_client.connectedEvent.addCallback(lambda _: first_client.sendSubscribeMessage(1, [1]))
+        first_client.connectedEvent.addCallback(lambda _: first_client.sendSubscribeMessage([1]))
         reactor.callLater(0.02, first_client.connector.disconnect)
         reactor.callLater(0.06, connectAnotherClient, reconnecting_client)
         
