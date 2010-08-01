@@ -192,7 +192,6 @@ class JuggernautService(service.Service):
         self.removeClient(client)
         
     def removeClient(self, client):
-        content_helper = RequestParamsHelper(client, [client.channel_id], self)
         try:
             self.channels[client.channel_id].remove(client)
             if len(self.channels[client.channel_id]) == 0:
