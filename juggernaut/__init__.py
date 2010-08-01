@@ -41,6 +41,7 @@ class JuggernautClient():
         
         if self.logoutTaskCall:
             self.logoutTaskCall.cancel()
+            self.logoutTaskCall = None
             
     def sendMessage(self, body):
         msg = Message(body)
