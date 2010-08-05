@@ -159,7 +159,7 @@ class JuggernautProtocol(protocol.Protocol):
         
         self.factory.service.authenticateBroadcastOrQuery(self, request)
         
-        method = getattr(self.factory.service, 'broadcast_' + request['type'])
+        method = getattr(self.factory.service, 'query_' + request['type'])
         method(request, self)
         
     def connectionLost(self, reason):
@@ -291,7 +291,7 @@ class JuggernautService(service.Service):
         for client_id in request['client_ids']:
             client = self._findClient(client_id)
             if client and request['channels'].__contains__(client.channel_id):
-                client.connector.disconnect()
+                client.connector.transport.loseConnection()
 
     def query_show_channels_for_client(self, request, connector):
         client = self._findClient(request['client_id'])

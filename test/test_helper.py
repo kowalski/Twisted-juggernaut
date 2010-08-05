@@ -24,7 +24,9 @@ class JuggernautTest(unittest.TestCase):
             ).addCallback(self.listeningPort.stopListening
             ).addCallback(self.webServer.connector.stopListening)
         return d
-
+    
+    def _assertClientIsConnected(self, client):
+        self.assertEqual('connected', client.connector.state)
 
 class TestConfig:
     config = {
@@ -81,10 +83,14 @@ class MockFlashClient:
             'client_id': id,
             'channels': channels
         }
-        return json.dumps(handshake) + "\0"
+        return self.sendMessage(handshake)
     
     def sendSubscribeMessage(self, channels=[1]):
         self.connector.transport.write(self.subscribeMessage(self.id, channels))
+        
+    def sendMessage(self, msg):
+        log.msg(self.connector.state)
+        self.connector.transport.write(json.dumps(msg) + "\0")
         
     def broadcastToChannelsMessage(self, body, channels):
         payload = {
@@ -93,7 +99,7 @@ class MockFlashClient:
             'channels': channels,
             'body': body
         }
-        return json.dumps(payload) + "\0"
+        return self.sendMessage(payload) 
         
     def sendBroadcastToChannelsMessage(self, body, channels):
         self.connector.transport.write(self.broadcastToChannelsMessage(body, channels))
