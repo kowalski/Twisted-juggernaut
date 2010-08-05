@@ -66,6 +66,18 @@ class JuggernautClient():
             self.writeMessageToConnection(message)
         self.stored_messages = None
         
+    def toJSON(self):
+        return json.dumps({
+            'client_id': self.client_id, 
+            'num_connections': self.numConnections(),
+            'session_id': self.session_id
+        })
+        
+    def numConnections(self):
+        if self.is_alive:
+            return 1
+        return 0
+        
 class IJuggernautProtocol(Interface):
     pass
 
@@ -134,11 +146,21 @@ class JuggernautProtocol(protocol.Protocol):
         
         self._checkExists(request, 'type', unicode)
         self._checkExists(request, 'body', [unicode, dict])
-        
+                
         self.factory.service.authenticateBroadcastOrQuery(self, request)
         
         method = getattr(self.factory.service, 'broadcast_' + request['type'])
         method(request)
+        
+    def queryCommand(self, request):
+        log.msg("QUERY: %s" % str(request))
+        
+        self._checkExists(request, 'type', unicode)
+        
+        self.factory.service.authenticateBroadcastOrQuery(self, request)
+        
+        method = getattr(self.factory.service, 'broadcast_' + request['type'])
+        method(request, self)
         
     def connectionLost(self, reason):
         if self.client:
@@ -260,11 +282,54 @@ class JuggernautService(service.Service):
          
     def broadcast_to_clients(self, request):
         for client_id in request['client_ids']:
-            try:
-                self.clients[client_id].sendMessage(request['body'])
-            except KeyError:
-                log.err('Client with id %s not found!' % client_id)
+            client = self._findClient(client_id)
+            if client:
+                client.sendMessage(request['body'])
+                
+    def query_remove_channels_from_client(self, request, connector):
+        '''Disconnect clients from the given channels'''
+        for client_id in request['client_ids']:
+            client = self._findClient(client_id)
+            if client and request['channels'].__contains__(client.channel_id):
+                client.connector.disconnect()
 
+    def query_show_channels_for_client(self, request, connector):
+        client = self._findClient(request['client_id'])
+        resp = None
+        if client:
+            resp = [ client.channel_id ]
+        self._publishResponse(connector, resp)
+        
+    def query_show_clients(self, request, connector):
+        if request.has_key('client_ids'):
+            clients = map(lambda x: self._findClient(x), request['client_ids'])
+            clients = filter(lambda x: x != None, clients)
+        else:
+            clients = self.clients
+        self._publishResponse(connector, map(lambda x: x.toJSON(), clients))
+    
+    def query_show_client(self, request, connector):
+        client = self._findClient(request['client_id'])
+        resp = client and client.to_json() or json.dumps(None)
+        self._publishResponse(connector, resp)
+        
+    def query_show_clients_for_channels(self, request, connector):
+        clients = []
+        for channel_id in request['channels']:
+            if self.channels.has_key[channel_id]:
+                clients = clients + self.channels[channel_id]
+        self._publishResponse(connector, map(lambda x: x.toJSON(), clients))
+            
+    def _publishResponse(self, connector, msg):
+        connector.transport.write(json.dumps(msg) + JuggernautProtocol.CR)
+    
+    def _findClient(self, client_id):
+        try:
+            return self.clients[client_id]
+        except KeyError:
+            log.err('Client with id %s not found!' % client_id)
+            return None
+    
 components.registerAdapter(JuggernautService, IJuggernautService, service.IService)
 
 def makeService(options):
