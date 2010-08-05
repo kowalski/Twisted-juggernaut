@@ -33,3 +33,35 @@ class BroadcastTest(JuggernautTest):
         d.addCallback(disconnectClients)
         
         return defer.DeferredList((map(lambda x: x.disconnectedEvent, clients + [rails_app])) + [d])
+            
+    def testBroadcastToClient(self):
+        self.webServer.expectRequests(6)
+        clients = map(lambda x: MockFlashClient(x), range(2))
+        rails_app = MockFlashClient()
+        
+        def subscribeClients(*a):
+            for client in clients:
+                client.sendSubscribeMessage()
+            
+        reactor.callLater(0.05, subscribeClients)
+        
+        messages = [ "First client", "Second client" ]
+        reactor.callLater(0.1, rails_app.sendBroadcastToClientsMessage, messages[0], [0])
+        reactor.callLater(0.1, rails_app.sendBroadcastToClientsMessage, messages[1], [1])
+        
+        def assertMessagesArrived(*a):
+            index = 0
+            for client in clients:
+                self.assertEqual(len(client.connector.transport.protocol.messages), 1)
+                msg = json.loads(client.connector.transport.protocol.messages[0])
+                self.assertEqual(msg['body'], messages[index])
+                index += 1
+        d = task.deferLater(reactor, 0.2, assertMessagesArrived)
+        
+        def disconnectClients(*a):
+            for client in clients + [rails_app]:
+                client.connector.disconnect()
+        d.addCallback(disconnectClients)
+        
+        return defer.DeferredList((map(lambda x: x.disconnectedEvent, clients + [rails_app])) + [d])
+        

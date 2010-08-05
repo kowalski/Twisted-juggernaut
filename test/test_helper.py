@@ -96,6 +96,19 @@ class MockFlashClient:
     def sendBroadcastToChannelsMessage(self, body, channels):
         self.connector.transport.write(self.broadcastToChannelsMessage(body, channels))
         
+    def broadcastToClientsMessage(self, body, clients):
+        payload = {
+            'command': 'broadcast',
+            'type': 'to_clients',
+            'client_ids': clients,
+            'body': body
+        }
+        return json.dumps(payload) + "\0"
+        
+    def sendBroadcastToClientsMessage(self, body, clients):
+        self.connector.transport.write(self.broadcastToClientsMessage(body, clients))
+    
+        
 class ChildResource(resource.Resource):
     def __init__(self, webserver):
         self.webserver = webserver
