@@ -31,7 +31,7 @@ class JuggernautClient():
         self.is_alive = False
         self.connector = None
         log.msg('Marked dead client_id=%s, channel_id=%s' % (str(self.client_id), str(self.channel_id)))
-        if self.channel_id:
+        if self.channel_id != None:
             self.service.disconnectedRequest(self, [self.channel_id])
         self.logoutTaskCall = reactor.callLater(self.service.config['timeout'], self.service.logoutRequest, self)
             
@@ -57,9 +57,9 @@ class Message:
     
     def __init__(self, body):
         self.body = body
-        self.id = self.current_id 
-        self.current_id += 1
-
+        self.id = Message.current_id 
+        Message.current_id += 1
+        
     def __str__(self):
         return json.dumps({'id': self.id, 'body': self.body})
 

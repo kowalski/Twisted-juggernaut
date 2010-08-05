@@ -65,3 +65,38 @@ class BroadcastTest(JuggernautTest):
         
         return defer.DeferredList((map(lambda x: x.disconnectedEvent, clients + [rails_app])) + [d])
         
+    def testTwoChannels(self):
+        '''Here we subscribe to two different channels and make sure message reach correct destination'''
+        self.webServer.expectRequests(12)
+        #base.DelayedCall.debug = True
+        clients = map(lambda x: MockFlashClient(x), range(4))
+        rails_app = MockFlashClient()
+        
+        def subscribeClients(*a):
+            index = 0
+            for client in clients:
+                client.sendSubscribeMessage([index / 2]) #two clients per channel 0 and 1
+                index += 1
+            
+        reactor.callLater(0.05, subscribeClients)
+        
+        messages = [ "First channel", "Second channel" ]
+        reactor.callLater(0.1, rails_app.sendBroadcastToChannelsMessage, messages[0], [0])
+        reactor.callLater(0.1, rails_app.sendBroadcastToChannelsMessage, messages[1], [1])
+        
+        def assertMessagesArrived(*a):
+            index = 0
+            for client in clients:
+                self.assertEqual(len(client.connector.transport.protocol.messages), 1)
+                msg = json.loads(client.connector.transport.protocol.messages[0])
+                self.assertEqual(msg['body'], messages[index / 2])
+                index += 1
+        d = task.deferLater(reactor, 0.2, assertMessagesArrived)
+        d.addErrback(errorHandler)
+        
+        def disconnectClients(*a):
+            for client in clients + [rails_app]:
+                client.connector.disconnect()
+        d.addCallback(disconnectClients)
+        
+        return defer.DeferredList((map(lambda x: x.disconnectedEvent, clients + [rails_app])) + [d])

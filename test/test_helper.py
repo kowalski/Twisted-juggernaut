@@ -19,7 +19,8 @@ class JuggernautTest(unittest.TestCase):
         self.webServer = MockWebServer()
         
     def tearDown(self):
-        d = self.webServer.getAllRequests().addCallback(self.listeningPort.stopListening
+        d = self.webServer.getAllRequests(
+            ).addCallback(self.listeningPort.stopListening
             ).addCallback(self.webServer.connector.stopListening)
         return d
 
