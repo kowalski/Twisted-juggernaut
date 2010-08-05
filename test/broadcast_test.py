@@ -100,3 +100,33 @@ class BroadcastTest(JuggernautTest):
         d.addCallback(disconnectClients)
         
         return defer.DeferredList((map(lambda x: x.disconnectedEvent, clients + [rails_app])) + [d])
+            
+    def testStoreMessagesOnReconnection(self):
+        '''Connect client. Disconnect him. Send messages. Reconnect, checks that messages arrived'''
+        self.webServer.expectRequests(5)
+        self.config['timeout'] = 0.5
+        
+        client = MockFlashClient(1)
+        reconnecting_client = MockFlashClient(1)
+        rails = MockFlashClient()
+        reactor.callLater(0.1, client.sendSubscribeMessage)
+        reactor.callLater(0.2, client.connector.disconnect)
+        
+        messages = [ "first", 'second', 'third' ]
+        reactor.callLater(0.3, rails.sendBroadcastToClientsMessage, messages[0], [1])
+        reactor.callLater(0.4, rails.sendBroadcastToClientsMessage, messages[1], [1])
+        reactor.callLater(0.5, rails.sendBroadcastToClientsMessage, messages[2], [1])
+        
+        reactor.callLater(0.6, reconnecting_client.sendSubscribeMessage)
+        
+        def assertMessagesArrived(client):
+            self.assertEqual(3, len(client.connector.transport.protocol.messages))
+            self.assertEqual(messages, map(lambda x: (json.loads(x))['body'], client.connector.transport.protocol.messages))
+        d = task.deferLater(reactor, 0.7, assertMessagesArrived, reconnecting_client)
+        
+        def disconnect(*a):
+            reconnecting_client.connector.disconnect()
+            rails.connector.disconnect()
+        d.addCallback(disconnect)
+        
+        return defer.DeferredList([rails.disconnectedEvent, client.disconnectedEvent, d])

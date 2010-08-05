@@ -30,25 +30,42 @@ class JuggernautClient():
     def markDead(self):
         self.is_alive = False
         self.connector = None
+        self.stored_messages = []
         log.msg('Marked dead client_id=%s, channel_id=%s' % (str(self.client_id), str(self.channel_id)))
         if self.channel_id != None:
             self.service.disconnectedRequest(self, [self.channel_id])
         self.logoutTaskCall = reactor.callLater(self.service.config['timeout'], self.service.logoutRequest, self)
             
     def markAlive(self, connector):
+        """Called when the disconnected client subscribes again"""
         self.connector = connector
         self.is_alive = True
+        self.sendStoredMessages()
         
         if self.logoutTaskCall:
             self.logoutTaskCall.cancel()
             self.logoutTaskCall = None
             
     def sendMessage(self, body):
-        msg = Message(body)
-        log.msg("Sending message to client_id=%s body=%s" % (str(self.client_id), str(msg)))
+        """Send message to connection, store it if client is dead"""
         
+        msg = Message(body)
+        if self.is_alive:
+            log.msg("Sending message to client_id=%s body=%s" % (str(self.client_id), str(msg)))
+            self.writeMessageToConnection(msg)
+        else:
+            self.stored_messages.append(msg)
+            
+    def writeMessageToConnection(self, msg):
+        """Write message body to a connection transport"""
         self.connector.transport.write(str(msg) + JuggernautProtocol.CR)
-
+        
+    def sendStoredMessages(self):
+        """Send stored messages after the client has been reconnected"""
+        for message in self.stored_messages:
+            self.writeMessageToConnection(message)
+        self.stored_messages = None
+        
 class IJuggernautProtocol(Interface):
     pass
 

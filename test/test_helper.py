@@ -12,9 +12,10 @@ class JuggernautTest(unittest.TestCase):
     timeout = 5
     
     def setUp(self):
-        self.service = juggernaut.makeService(TestConfig.config)
+        self.config = dict(TestConfig.config)
+        self.service = juggernaut.makeService(self.config)
         factory = juggernaut.IJuggernautFactory(self.service)
-        self.listeningPort = reactor.listenTCP(TestConfig.config['port'], factory)
+        self.listeningPort = reactor.listenTCP(self.config['port'], factory)
         
         self.webServer = MockWebServer()
         
