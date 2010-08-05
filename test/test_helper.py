@@ -29,7 +29,7 @@ class JuggernautTest(unittest.TestCase):
 class TestConfig:
     config = {
         'host': 'localhost',
-        'port': 5001,
+        'port': 5002,
         'allowed_ips': ['127.0.0.1'],
         'subscription_url': 'http://localhost:8080/subscribe',
         'logout_connection_url': 'http://localhost:8080/disconnected',

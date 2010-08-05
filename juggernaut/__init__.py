@@ -110,8 +110,11 @@ class JuggernautProtocol(protocol.Protocol):
             method = getattr(self, request['command'] + "Command")
             method(request)
         except Exception as e:
-            log.err("Processing message failed with exception: %s" % str(e))
-            self.transport.loseConnection()
+            if message == "<policy-file-request/>":
+                self.sendPolicyFile()
+            else:
+                log.err("Processing message failed with exception: %s" % str(e))
+                self.transport.loseConnection()
         
     def subscribeCommand(self, request):
         log.msg("SUBSCRIBE: %s" % str(request))
@@ -130,7 +133,7 @@ class JuggernautProtocol(protocol.Protocol):
         log.msg("BROADCAST: %s" % str(request))
         
         self._checkExists(request, 'type', unicode)
-        self._checkExists(request, 'body', unicode)
+        self._checkExists(request, 'body', [unicode, dict])
         
         self.factory.service.authenticateBroadcastOrQuery(self, request)
         
@@ -141,9 +144,19 @@ class JuggernautProtocol(protocol.Protocol):
         if self.client:
             self.client.markDead()
 
-    def _checkExists(self, request, key, klass):
-        if not isinstance(request[key], klass):
-            raise ValueError("Key %s should be of type of %s, but was %s instead" % (key, klass.__name__, request[key].__class__.__name__))
+    def _checkExists(self, request, key, classes):
+        if not isinstance(classes, list):
+            classes = [ classes ]
+        if not classes.__contains__(request[key].__class__):
+            raise ValueError("Key %s should be of type of %s, but was %s instead" % (key, str(classes), request[key].__class__.__name__))
+
+    def sendPolicyFile(self):
+        log.msg('Sending policy file')
+        self.transport.write('''
+            <cross-domain-policy>
+                <allow-access-from domain="*" to-ports="%d" />
+            </cross-domain-policy>''' % self.factory.service.config['port'])
+        self.transport.loseConnection()
 
 class IJuggernautFactory(Interface):
     pass
