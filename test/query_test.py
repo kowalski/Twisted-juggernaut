@@ -101,6 +101,18 @@ class QueryTest(JuggernautTest):
         
         return defer.DeferredList([self.client.disconnectedEvent, client2.disconnectedEvent, dd1, dd2, dd3, dd4])
         
+    def testShowClient(self):
+        self.webServer.expectRequests(3)
+        reactor.callLater(0.2, self._sendShowClient, 1)
+        reactor.callLater(0.25, self._assertResponse, { 'client_id': 1, 'session_id': 1, "num_connections": 1 })
+        
+        reactor.callLater(0.25, self._sendShowClient, 2)
+        reactor.callLater(0.3, self._assertResponse, None)
+        
+        reactor.callLater(0.35, self.client.connector.disconnect)
+        
+        return self.client.disconnectedEvent
+    
     def _sendRemoveChannelsMessage(self, client_ids, channels):
         self.rails.sendMessage({
             'command': 'query',
@@ -130,6 +142,13 @@ class QueryTest(JuggernautTest):
             'command': 'query',
             'type': 'show_clients_for_channels',
             'channels': channels
+        })
+    
+    def _sendShowClient(self, client_id):
+        self.rails.sendMessage({
+            'command': 'query',
+            'type': 'show_client',
+            'client_id': client_id
         })
     
     def _assertResponse(self, response):

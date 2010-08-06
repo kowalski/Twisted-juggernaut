@@ -311,7 +311,7 @@ class JuggernautService(service.Service):
     
     def query_show_client(self, request, connector):
         client = self._findClient(request['client_id'])
-        resp = client and client.to_json() or json.dumps(None)
+        resp = client and client.toReprHash()
         self._publishResponse(connector, resp)
         
     def query_show_clients_for_channels(self, request, connector):
