@@ -317,7 +317,7 @@ class JuggernautService(service.Service):
     def query_show_clients_for_channels(self, request, connector):
         clients = []
         for channel_id in request['channels']:
-            if self.channels.has_key[channel_id]:
+            if self.channels.has_key(channel_id):
                 clients = clients + self.channels[channel_id]
         self._publishResponse(connector, map(lambda x: x.toReprHash(), clients))
             
