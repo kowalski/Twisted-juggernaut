@@ -39,6 +39,17 @@ class QueryTest(JuggernautTest):
         
         return self.client.disconnectedEvent
         
+    def testQueryShowChannelsForClient(self):
+        self.webServer.expectRequests(3)
+        
+        reactor.callLater(0.2, self._sendShowChannelsMessage, 1)
+        reactor.callLater(0.3, self._assertResponse, [1])
+        reactor.callLater(0.3, self._sendShowChannelsMessage, 2) #nonexisting client
+        reactor.callLater(0.4, self._assertResponse, None)
+        
+        d = task.deferLater(reactor, 0.5, self.client.connector.disconnect)
+        
+        return self.client.disconnectedEvent
         
     def _sendRemoveChannelsMessage(self, client_ids, channels):
         self.rails.sendMessage({
@@ -47,3 +58,13 @@ class QueryTest(JuggernautTest):
             'client_ids': client_ids,
             'channels': channels
         })
+        
+    def _sendShowChannelsMessage(self, client_id):
+        self.rails.sendMessage({
+            'command': 'query',
+            'type': 'show_channels_for_client',
+            'client_id': client_id
+        })
+        
+    def _assertResponse(self, response):
+        self.assertEqual(response, json.loads(self.rails.connector.transport.protocol.messages[-1]))
