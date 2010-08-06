@@ -66,12 +66,13 @@ class JuggernautClient():
             self.writeMessageToConnection(message)
         self.stored_messages = None
         
-    def toJSON(self):
-        return json.dumps({
+    def toReprHash(self):
+        '''Return a hash with describing the client connection. Yes format here doesn't have much of a sense, but it is left like this for the sake of being compatibile with original implementation'''
+        return {
             'client_id': self.client_id, 
             'num_connections': self.numConnections(),
             'session_id': self.session_id
-        })
+        }
         
     def numConnections(self):
         if self.is_alive:
@@ -305,8 +306,8 @@ class JuggernautService(service.Service):
             clients = map(lambda x: self._findClient(x), request['client_ids'])
             clients = filter(lambda x: x != None, clients)
         else:
-            clients = self.clients
-        self._publishResponse(connector, map(lambda x: x.toJSON(), clients))
+            clients = self.clients.values()
+        self._publishResponse(connector, map(lambda x: x.toReprHash(), clients))
     
     def query_show_client(self, request, connector):
         client = self._findClient(request['client_id'])
@@ -318,7 +319,7 @@ class JuggernautService(service.Service):
         for channel_id in request['channels']:
             if self.channels.has_key[channel_id]:
                 clients = clients + self.channels[channel_id]
-        self._publishResponse(connector, map(lambda x: x.toJSON(), clients))
+        self._publishResponse(connector, map(lambda x: x.toReprHash(), clients))
             
     def _publishResponse(self, connector, msg):
         connector.transport.write(json.dumps(msg) + JuggernautProtocol.CR)

@@ -51,6 +51,31 @@ class QueryTest(JuggernautTest):
         
         return self.client.disconnectedEvent
         
+    def testShowClients(self):
+        self.webServer.expectRequests(6)
+        self.config['timeout'] = 0.1
+        
+        reactor.callLater(0.2, self._sendShowClientsMessage)
+        reactor.callLater(0.25, self._assertResponse, [{ 'client_id': 1, 'session_id': 1, "num_connections": 1 }])
+        
+        client2 = MockFlashClient(2)
+        reactor.callLater(0.3, client2.sendSubscribeMessage, [2])
+        
+        reactor.callLater(0.35, self._sendShowClientsMessage, [1]) #query only for the previous client
+        reactor.callLater(0.4, self._assertResponse, [{ 'client_id': 1, 'session_id': 1, "num_connections": 1 }])
+        reactor.callLater(0.45, self._sendShowClientsMessage)
+        reactor.callLater(0.5, self._assertResponse, [{ 'client_id': 1, 'session_id': 1, "num_connections": 1 }, { 'client_id': 2, 'session_id': 2, "num_connections": 1 }])
+        
+        d = task.deferLater(reactor, 0.55, self.client.connector.disconnect)
+        d.addCallback(lambda _: client2.connector.disconnect())
+        dd1 = task.deferLater(reactor, 0.6, self._sendShowClientsMessage)
+        dd2 = task.deferLater(reactor, 0.65, self._assertResponse, [{ 'client_id': 1, 'session_id': 1, "num_connections": 0 }, { 'client_id': 2, 'session_id': 2, "num_connections": 0 }]) # dead clients should report num_connection = 0
+        
+        dd3 = task.deferLater(reactor, 0.7, self._sendShowClientsMessage)
+        dd4 = task.deferLater(reactor, 0.75, self._assertResponse, []) # after timeout clients vanish
+        
+        return defer.DeferredList([self.client.disconnectedEvent, client2.disconnectedEvent, dd1, dd2, dd3, dd4])
+        
     def _sendRemoveChannelsMessage(self, client_ids, channels):
         self.rails.sendMessage({
             'command': 'query',
@@ -66,5 +91,14 @@ class QueryTest(JuggernautTest):
             'client_id': client_id
         })
         
+    def _sendShowClientsMessage(self, client_ids=None):
+        msg = {
+            'command': 'query',
+            'type': 'show_clients'
+        }
+        if client_ids:
+            msg['client_ids'] = client_ids
+        self.rails.sendMessage(msg)
+    
     def _assertResponse(self, response):
         self.assertEqual(response, json.loads(self.rails.connector.transport.protocol.messages[-1]))

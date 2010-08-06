@@ -89,7 +89,6 @@ class MockFlashClient:
         self.connector.transport.write(self.subscribeMessage(self.id, channels))
         
     def sendMessage(self, msg):
-        log.msg(self.connector.state)
         self.connector.transport.write(json.dumps(msg) + "\0")
         
     def broadcastToChannelsMessage(self, body, channels):
