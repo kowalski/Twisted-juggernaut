@@ -1,15 +1,14 @@
 import juggernaut
 from twisted.application import internet, service
+from twisted.python import log
+import yaml
 
-config = {
-    'host': 'localhost',
-    'port': 5001,
-    'allowed_ips': ['127.0.0.1'],
-    'subscription_url': 'http://localhost:3000/juggernaut/subscribe',
-    'logout_connection_url': 'http://localhost:3000/juggernaut/disconnected',
-    'logout_url': 'http://localhost:3000/juggernaut/logged_out',
-    'timeout': 10
-}
+config_name = 'juggernaut.yml'
+try:
+    config = yaml.load(open(config_name, 'r').read())
+except IOError:
+    log.err("Config file %s not found! " % config_name)
+    raise
 
 application = service.Application("juggernaut")
 f = juggernaut.makeService(config)
